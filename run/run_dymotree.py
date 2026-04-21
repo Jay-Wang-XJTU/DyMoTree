@@ -25,12 +25,8 @@ def load_config(config_path: str) -> Dict[str, Any]:
 def is_allowed_sweep_list(key: str, value: Any) -> bool:
     if not isinstance(value, list):
         return False
-    if len(value) == 0:
-        raise ValueError(f"参数 `{key}` 不能是空 list。")
 
     if key in SWEEP_STRING_KEYS:
-        if not all(isinstance(v, str) for v in value):
-            raise ValueError(f"`{key}` 若为 list，则必须全是字符串。")
         return True
 
     if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value):
@@ -49,7 +45,6 @@ def find_sweep_candidates(obj: Any, path: str = "") -> List[Tuple[str, List[Any]
             if isinstance(v, dict):
                 candidates.extend(find_sweep_candidates(v, current_path))
             elif isinstance(v, list):
-                # seed 单独处理，不算普通 sweep 参数
                 if current_path.endswith("seed"):
                     continue
                 if is_allowed_sweep_list(k, v):
@@ -62,16 +57,12 @@ def get_seed_list(cfg: Dict[str, Any]) -> List[int]:
     seed = cfg["model"]["seed"]
 
     if isinstance(seed, list):
-        if len(seed) == 0:
-            raise ValueError("seed list 不能为空。")
-        if not all(isinstance(s, int) for s in seed):
-            raise ValueError("seed list 必须全是 int。")
         return seed
 
     if isinstance(seed, int):
         return [seed]
 
-    raise ValueError("seed 必须是 int 或 list[int]。")
+    raise ValueError("seed must be int or list[int]。")
 
 
 def get_by_path(cfg: Dict[str, Any], path: str) -> Any:
@@ -91,9 +82,9 @@ def set_by_path(cfg: Dict[str, Any], path: str, value: Any) -> None:
 
 def validate_terminals(terminals: List[str]) -> None:
     if not isinstance(terminals, list) or len(terminals) != 2:
-        raise ValueError("`model.terminal` 必须是长度为 2 的列表。")
+        raise ValueError("`model.terminal` must be list")
     if not all(isinstance(x, str) for x in terminals):
-        raise ValueError("`model.terminal` 必须是字符串列表。")
+        raise ValueError("`model.terminal` must be list")
 
 
 def compute_fate_bias(hspc, terminals: List[str], fate_bias_col: str) -> None:
@@ -104,11 +95,6 @@ def compute_fate_bias(hspc, terminals: List[str], fate_bias_col: str) -> None:
 
     first_col = f"{first_terminal}_fate"
     second_col = f"{second_terminal}_fate"
-
-    if first_col not in hspc.obs:
-        raise KeyError(f"未找到列: {first_col}")
-    if second_col not in hspc.obs:
-        raise KeyError(f"未找到列: {second_col}")
 
     numerator = hspc.obs[first_col]
     denominator = hspc.obs[first_col] + hspc.obs[second_col]
@@ -181,12 +167,6 @@ def run_one_experiment(cfg: Dict[str, Any]) -> Dict[str, Any]:
 def prepare_runs(base_cfg: Dict[str, Any]):
     candidates = find_sweep_candidates(base_cfg)
     seed_list = get_seed_list(base_cfg)
-
-    if len(candidates) > 1:
-        names = ", ".join(path for path, _ in candidates)
-        raise ValueError(
-            f"检测到多个普通 list 参数：{names}。当前只允许一个普通参数为 list，seed 可单独为 list。"
-        )
 
     runs = []
 
